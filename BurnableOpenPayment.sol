@@ -18,10 +18,17 @@ contract BurnableOpenPayment {
     address public payer;
     address public recipient;
     address public burnAddress = 0xdead;
+    string public payerString;
+    string public recipientString;
     uint public commitThreshold;
     
     modifier onlyPayer() {
         if (msg.sender != payer) throw;
+        _;
+    }
+    
+    modifier onlyRecipient() {
+        if (msg.sender != recipient) throw;
         _;
     }
     
@@ -45,22 +52,19 @@ contract BurnableOpenPayment {
     }
     
     function getPayer()
-    public
-    returns (address) {
-        return payer;
-    }
+    public returns (address) { return payer; }
     
     function getRecipient()
-    public
-    returns (address) {
-        return recipient;
-    }
+    public returns (address) { return recipient; }
     
     function getCommitThreshold()
-    public
-    returns (uint) {
-        return commitThreshold;
-    }
+    public returns (uint) { return commitThreshold; }
+    
+    function getPayerString()
+    public returns (string) { return payerString; }
+    
+    function getRecipientString()
+    public returns (string) { return recipientString; }
     
     function commit()
     public
@@ -87,6 +91,20 @@ contract BurnableOpenPayment {
     returns (bool)
     {
         return recipient.send(amount);
+    }
+    
+    function setPayerString(string _string)
+    public
+    onlyPayer()
+    {
+        payerString = _string;
+    }
+    
+    function setRecipientString(string _string)
+    public
+    onlyRecipient()
+    {
+        recipientString = _string;
     }
 }
 
