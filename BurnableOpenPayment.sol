@@ -1,4 +1,4 @@
-//A BurnableOpenPaymet is instantiated with a specified payer and a commitThreshold.
+//A BurnableOpenPayment is instantiated with a specified payer and a commitThreshold.
 //The recipient is not set when the contract is instantiated.
 
 //The constructor is payable, so the contract can be instantiated with initial funds.
