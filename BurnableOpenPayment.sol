@@ -24,7 +24,7 @@ contract BurnableOpenPayment {
     
     uint public commitThreshold;
     
-    enum DefaultAction {Burn, Release, None}
+    enum DefaultAction {None, Release, Burn}
     DefaultAction public defaultAction;
     uint public defaultTimeoutLength;
     uint public defaultTriggerTime;
@@ -46,7 +46,7 @@ contract BurnableOpenPayment {
     event FundsReleased(uint amount);
     event Expended();
     event Unexpended();
-    event DefaultTimeoutDelayed();
+    event DefaultActionDelayed();
     event DefaultActionCalled();
     
     function BurnableOpenPayment(address _payer, string _payerString, uint _commitThreshold, DefaultAction _defaultAction, uint _defaultTimeoutLength)
@@ -170,7 +170,7 @@ contract BurnableOpenPayment {
     {
         if (defaultAction == DefaultAction.None) throw;
         
-        DefaultTimeoutDelayed();
+        DefaultActionDelayed();
         defaultTriggerTime = now + defaultTimeoutLength;
     }
     
