@@ -15,29 +15,50 @@
 pragma solidity ^0.4.10;
 
 contract BurnableOpenPayment {
+    //BOP will start with a payer but no recipient (recipient==0x0)
     address public payer;
     address public recipient;
     address constant burnAddress = 0x0;
     
+    //Note that these will track, but not influence the BOP logic.
+    uint public amountDeposited;
+    uint public amountBurned;
+    uint public amountReleased;
+    
+    //payerString and recipientString enable rudimentary communication/publishing.
+    //Although the two parties might quickly move to another medium with better privacy or convenience,
+    //beginning with this is nice because it's already trustless/transparent/signed/pseudonymous/etc.
     string public payerString;
     string public recipientString;
     
+    //Amount of ether a prospective recipient must pay to become (permanently) the recipient. See commit().
     uint public commitThreshold;
     
+    //What if the payer falls off the face of the planet?
+    //A BOP is instantiated with a chosen defaultAction, and this cannot be changed.
     enum DefaultAction {None, Release, Burn}
     DefaultAction public defaultAction;
+    
+    //if defaultAction != None, how long should we wait before giving up?
+    //Set in constructor:
     uint public defaultTimeoutLength;
+    
+    //Calculated from defaultTimeoutLength on a successful recipient commit(),
+    //as well as whenever the payer (or possibly the recipient) calls delayDefaultAction()
     uint public defaultTriggerTime;
     
+    //Most action happens in the Committed state.
     enum State {Open, Committed, Expended}
     State public state;
+    //Note that a BOP cannot go from Committed back to Open, but it can go from Expended back to Committed
+    //(this would retain the committed recipient). Search for Expended and Unexpended events to see how this works.
     
     modifier inState(State s) { if (s != state) throw; _; }
     modifier onlyPayer() { if (msg.sender != payer) throw; _; }
     modifier onlyRecipient() { if (msg.sender != recipient) throw; _; }
     modifier onlyPayerOrRecipient() { if ((msg.sender != payer) && (msg.sender != recipient)) throw; _; }
     
-    event FundsAdded(uint amount);
+    event FundsAdded(uint amount);//The payer has added funds to the BOP.
     event PayerStringUpdated(string newPayerString);
     event RecipientStringUpdated(string newRecipientString);
     event FundsRecovered();
@@ -52,13 +73,28 @@ contract BurnableOpenPayment {
     function BurnableOpenPayment(address _payer, string _payerString, uint _commitThreshold, DefaultAction _defaultAction, uint _defaultTimeoutLength)
     public
     payable {
+        if (msg.value > 0) {
+            FundsAdded(msg.value);
+            amountDeposited += msg.value;
+        }
+            
         state = State.Open;
         payer = _payer;
         payerString = _payerString;
         PayerStringUpdated(payerString);
+        
         commitThreshold = _commitThreshold;
+        
         defaultAction = _defaultAction;
-        defaultTimeoutLength = _defaultTimeoutLength;
+        if (defaultAction != DefaultAction.None) 
+            defaultTimeoutLength = _defaultTimeoutLength;
+    }
+    
+    function getFullState()
+    public
+    constant
+    returns (State, string, address, string, uint, uint, uint, uint) {
+        return (state, payerString, recipient, recipientString, amountDeposited, amountBurned, amountReleased, defaultTriggerTime);
     }
     
     function addFunds()
@@ -66,7 +102,9 @@ contract BurnableOpenPayment {
     onlyPayer()
     payable {
         if (msg.value == 0) throw;
+        
         FundsAdded(msg.value);
+        amountDeposited += msg.value;
         if (state == State.Expended) {
             state = State.Committed;
             Unexpended();
@@ -88,6 +126,12 @@ contract BurnableOpenPayment {
     payable
     {
         if (msg.value < commitThreshold) throw;
+        
+        if (msg.value > 0) {
+            FundsAdded(msg.value);
+            amountDeposited += msg.value;
+        }
+        
         recipient = msg.sender;
         state = State.Committed;
         Committed(recipient);
@@ -105,11 +149,14 @@ contract BurnableOpenPayment {
         bool success = burnAddress.send(amount);
         if (success) {
             FundsBurned(amount);
+            amountBurned += amount;
         }
+        
         if (this.balance == 0) {
             state = State.Expended;
             Expended();
         }
+        
         return success;
     }
     
@@ -130,7 +177,9 @@ contract BurnableOpenPayment {
         bool success = recipient.send(amount);
         if (success) {
             FundsReleased(amount);
+            amountReleased += amount;
         }
+        
         if (this.balance == 0) {
             state = State.Expended;
             Expended();
